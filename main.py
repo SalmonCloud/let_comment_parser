@@ -1,36 +1,9 @@
 import csv
-# import requests
-# from urllib.parse import urlparse
 from os.path import exists
 from random import sample
 
 OUTPUT_FILENAME = "username_comments.csv"
 
-
-# def clean_up_url(url: str) -> str:
-#     """Remove query string, and trailing / and page number in the path."""
-#     parse_result = urlparse(url)
-#     clean_path: str = parse_result.path
-#     if parse_result.path.endswith("/"):
-#         clean_path = clean_path[:-1]
-#     path_tail = parse_result.path.split("/")[-1]
-#     if path_tail.startswith("p"):
-#         if path_tail[1:].isdecimal():
-#             # The last path section is page number. Remove.
-#             clean_path = "".join(clean_path.split("/")[:-1])
-#     clean_url = parse_result.scheme + "://" + parse_result.netloc + clean_path
-#     return clean_url
-#
-#
-# def download_pages(url: str):
-#     # page_exists = True
-#     page_num = 1
-#
-#     # while page_exists:
-#     response = requests.get(f"{url}/p{page_num}")
-#     with open(f"page{page_num}.html", "wt") as file:
-#         file.write(response.text)
-#
 
 def extract_info(file):
     line = ""
@@ -62,8 +35,6 @@ def write_csv_output(csv_file, *row):
 
 
 if __name__ == "__main__":
-    # raw_url = input("Please enter the URL to the LET post:\n")
-    # download_pages(clean_up_url(raw_url))
     print("Before using this program, please save every page "
           "of the post in the following format:")
     print("page?.html    (? stands for the page number)")
