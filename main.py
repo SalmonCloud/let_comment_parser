@@ -1,69 +1,57 @@
 import csv
-# import requests
-# from urllib.parse import urlparse
+from typing import TextIO, Union
 from os.path import exists
 from random import sample
+
+HtmlTagList = list[Union[str, tuple[str]]]
 
 OUTPUT_FILENAME = "username_comments.csv"
 
 
-# def clean_up_url(url: str) -> str:
-#     """Remove query string, and trailing / and page number in the path."""
-#     parse_result = urlparse(url)
-#     clean_path: str = parse_result.path
-#     if parse_result.path.endswith("/"):
-#         clean_path = clean_path[:-1]
-#     path_tail = parse_result.path.split("/")[-1]
-#     if path_tail.startswith("p"):
-#         if path_tail[1:].isdecimal():
-#             # The last path section is page number. Remove.
-#             clean_path = "".join(clean_path.split("/")[:-1])
-#     clean_url = parse_result.scheme + "://" + parse_result.netloc + clean_path
-#     return clean_url
-#
-#
-# def download_pages(url: str):
-#     # page_exists = True
-#     page_num = 1
-#
-#     # while page_exists:
-#     response = requests.get(f"{url}/p{page_num}")
-#     with open(f"page{page_num}.html", "wt") as file:
-#         file.write(response.text)
-#
-
-def extract_info(file):
-    line = ""
-    while not line.startswith("<a title="):
-        line = next(file)
-    username = line.split('"', 2)[1]
-    # print(username)
-
-    while True:
-        line = next(file)
-        if line.startswith("<blockquote"):
-            while not line.endswith("</blockquote>\n"):
+def descend_into_html_tags(html_tag_list: HtmlTagList, file: TextIO):
+    line = next(file)
+    for tag in html_tag_list:
+        if type(tag) is str:
+            while tag not in line:
                 line = next(file)
-        if line.startswith("<p>"):
-            comment = ""
-            while True:
-                comment += line.strip("<p>").strip("</p>\n")
-                if line.endswith("</p>\n"):
-                    break
+        elif type(tag) is tuple:
+            no_tag_option_found = True
+            while no_tag_option_found:
+                for tag_option in tag:
+                    if tag_option in line:
+                        no_tag_option_found = False
+                        break
+                else:
+                    line = next(file)
+
+
+def extract_username(file: TextIO) -> str:
+    line = next(file)
+    title_atrribute = line.strip().split(' ')[1]
+    username = title_atrribute.split("=")[1].strip('"')
+    return username
+
+
+def extract_comment(file: TextIO) -> str:
+    comment = ""
+    line = next(file)
+    while "</div>" not in line:
+        # Skip user's quote.
+        if '<blockquote class="UserQuote">' in line:
+            while "</blockquote>" not in line:
                 line = next(file)
-            # print(comment)
-            break
-    return username, comment
+        else:
+            comment += line.strip().strip("<p>").strip("</p>")
+        line = next(file)
+    return comment
 
 
-def write_csv_output(csv_file, *row):
+def write_csv_output(csv_file: TextIO, *row):
     csv_writer = csv.writer(csv_file)
     csv_writer.writerow([*row])
 
 
 if __name__ == "__main__":
-    # raw_url = input("Please enter the URL to the LET post:\n")
-    # download_pages(clean_up_url(raw_url))
     print("Before using this program, please save every page "
           "of the post in the following format:")
     print("page?.html    (? stands for the page number)")
@@ -74,20 +62,46 @@ if __name__ == "__main__":
     max_page_num = int(
         input("Please the enter the maximum page number of the LET post: "))
     username_comments = dict()  # {"username": [comment1, comment2]}
+    html_tag_list_username: HtmlTagList = [
+        ('<li class="Item ItemComment', '<li class="Item Alt ItemComment'),
+        '<div class="Comment">',
+        '<div class="Item-Header CommentHeader">',
+        '<div class="AuthorWrap">',
+        '<span class="Author">'
+    ]
+    html_tag_list_comment: HtmlTagList = [
+        '<div class="Item-BodyWrap">',
+        '<div class="Item-Body">',
+        '<div class="Message userContent">',
+    ]
+
     for i in range(1, max_page_num + 1):
         filename = f"page{i}.html"
         if not exists(filename):
             print(f"WARNING: {filename} does not exist. Please make sure "
                   "you have downloaded and named it properly.")
             continue
+
         with open(filename, "rt") as file:
+            # Find the start of comment section.
+            descend_into_html_tags(list('<div class="CommentsWrap">'), file)
+
             while True:
                 try:
-                    username, comment = extract_info(file)
+                    # Find the line before the one
+                    # where username can be extracted.
+                    descend_into_html_tags(html_tag_list_username, file)
                 except StopIteration:
                     print(f"{filename} has been fully parsed.")
                     break
                 else:
+                    username = extract_username(file)
+
+                    # Find the line before the one
+                    # where user's quote or comment can be found.
+                    descend_into_html_tags(html_tag_list_comment, file)
+                    comment = extract_comment(file)
+
                     if username in username_comments:
                         username_comments[username].append(comment)
                     else:
